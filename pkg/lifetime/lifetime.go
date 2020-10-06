@@ -40,7 +40,7 @@ type Lifetime struct {
 // New creates a new lifetime, starting now, lasting for the specified duration.
 func New(duration time.Duration) Lifetime {
 	return Lifetime{
-		Created: time.Now(),
+		Created: time.Now().UTC(),
 		TTL:     duration,
 	}
 }
