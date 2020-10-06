@@ -84,11 +84,7 @@ func Handler(cache *ttlcache.Cache, prefix string) http.Handler {
 		headers.Add("Content-Length", strconv.Itoa(len(d)))
 		headers.Add(lifetimeCreatedHeader, fmt.Sprintf("%f", timeToUnixFractional(lt.Created)))
 		headers.Add(lifetimeTTLHeader, fmt.Sprintf("%f", durationToUnixFractional(lt.TTL)))
-		if _, err := w.Write(d); err != nil {
-			// unlikely to succeed given we've already started the body
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		w.Write(d) // ignore error; cannot update headers given we've already started the body
 	})
 	return promhttp.InstrumentHandlerInFlight(
 		handleInFlight.WithLabelValues(cache.Name),
