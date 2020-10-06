@@ -2,7 +2,6 @@ package ttlcache
 
 import (
 	"context"
-	"log"
 	"math/rand"
 	"time"
 
@@ -151,7 +150,6 @@ func (c *Cache) Get(ctx context.Context, key string) ([]byte, lifetime.Lifetime,
 				c.maybeHotCache(key, d, lt)
 				return d, c.capLifetime(key, lt), nil
 			}
-			log.Printf("peer load failure: %v", err)
 			// peer may have died between pick and request; if we wanted to be
 			// more aggressive about deduplicating loads, we could re-pick and
 			// try again before falling back to loading ourselves
