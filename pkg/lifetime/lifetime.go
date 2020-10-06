@@ -45,7 +45,8 @@ func New(duration time.Duration) Lifetime {
 	}
 }
 
-// Remaining returns the time left before the lifetime expires.
+// Remaining returns the time left before the lifetime expires. This will be
+// negative if the lifetime has expired.
 func (l Lifetime) Remaining() time.Duration {
 	return l.Created.Add(l.TTL).Sub(time.Now())
 }
