@@ -1,3 +1,4 @@
+// Package lifetime provides specification of overridable TTLs.
 package lifetime
 
 import (
@@ -49,13 +50,14 @@ func (l Lifetime) Remaining() time.Duration {
 	return l.Created.Add(l.TTL).Sub(time.Now())
 }
 
-// Expired returns true if the lifetime has passed, or false otherwise.
+// Expired returns true if the lifetime has passed, or false if it is still
+// valid.
 func (l Lifetime) Expired() bool {
 	return l.Remaining() < 0
 }
 
-// Cap limits the lifetime's TTL to a duration. If the duration is below the
-// current TTL, the original lifetime is returned.
+// Cap imposes an upper limit on the lifetime from the point of creation. If the
+// existing TTL is below the cap one, the original lifetime is returned.
 func (l Lifetime) Cap(duration time.Duration) Lifetime {
 	if l.TTL < duration {
 		return l
