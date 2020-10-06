@@ -114,10 +114,10 @@ func UninstrumentedHandler(cache *ttlcache.Cache, prefix string, timeout time.Du
 		}
 
 		header := w.Header()
-
 		// save Write() from trying to guess
 		header.Set("Content-Type", "application/octet-stream")
 		header.Set("Content-Length", strconv.Itoa(len(d)))
+		header.Set("Expires", lt.Expires().Format(http.TimeFormat))
 		setTimeHeader(header, lifetimeCreatedHeader, lt.Created)
 		setDurationHeader(header, lifetimeTTLHeader, lt.TTL)
 		w.Write(d) // ignore error; cannot update headers given we've already started the body

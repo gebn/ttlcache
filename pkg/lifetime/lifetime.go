@@ -30,7 +30,7 @@ var (
 // for implementing TTL overrides.
 type Lifetime struct {
 
-	// Created is when the value was produced or retrieved.
+	// Created is when the value was produced or retrieved in UTC.
 	Created time.Time
 
 	// TTL is the duration after Created for which the value is valid.
@@ -45,10 +45,15 @@ func New(duration time.Duration) Lifetime {
 	}
 }
 
+// Expires returns when the lifetime becomes invalid in UTC.
+func (l Lifetime) Expires() time.Time {
+	return l.Created.Add(l.TTL)
+}
+
 // Remaining returns the time left before the lifetime expires. This will be
 // negative if the lifetime has expired.
 func (l Lifetime) Remaining() time.Duration {
-	return l.Created.Add(l.TTL).Sub(time.Now())
+	return l.Expires().Sub(time.Now().UTC())
 }
 
 // Expired returns true if the lifetime has passed, or false if it is still
