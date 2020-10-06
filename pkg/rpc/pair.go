@@ -13,7 +13,9 @@ import (
 type Pair struct {
 
 	// BasePath is the prefix under which the loader and handler will operate,
-	// e.g. /ttlcache.
+	// e.g. /ttlcache/caches/<name>. The loader and handler are deliberately not
+	// cache-aware to allow registering different handlers against different
+	// caches.
 	BasePath string
 
 	// Timeout is the per-request timeout, used for each attempt in Loader, and

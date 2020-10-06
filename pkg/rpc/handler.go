@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -45,21 +44,6 @@ var (
 	)
 )
 
-// parseKey validates the request path, extracts the cache name and key name,
-// checks the cache name matches the cache we are serving from, and returns the
-// key name.
-func parseKey(path, prefix, cache string) (string, error) {
-	trimmed := strings.TrimPrefix(path, prefix)
-	fragments := strings.SplitN(trimmed, "/", 5) // allow splitting off one too many fragments to catch the error
-	if len(fragments) != 4 {
-		return "", fmt.Errorf("expected path of form caches/<cache>/keys/<key>, got %v", trimmed)
-	}
-	if fragments[1] != cache {
-		return "", fmt.Errorf("expecting requests for cache '%v' but got '%v'", cache, fragments[1])
-	}
-	return fragments[3], nil
-}
-
 // determineCtx examines a request for a client-side timeout. If below the
 // specified server-side timeout, it is used. If the client gave a bad value, we
 // reject the request rather than fall back.
@@ -85,13 +69,15 @@ func determineCtx(req *http.Request, timeout time.Duration) (context.Context, co
 }
 
 // Handler returns a http.Handler to respond to requests sent by Loader. We
-// expect requests with a path beginning with prefix, which should match the
-// first argument to http.Handle(), e.g. "/".
-func Handler(cache *ttlcache.Cache, prefix string, timeout time.Duration) http.Handler {
+// expect requests with a path beginning with basePath, which should match the
+// first argument to http.Handle(), e.g. "/". Note it must end with a trailing
+// slash in order to do a prefix rather than exact match.
+func Handler(cache *ttlcache.Cache, basePath string, timeout time.Duration) http.Handler {
+	basePath = basePath + "keys/"
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key, err := parseKey(r.URL.Path, prefix, cache.Name)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
+		key := strings.TrimPrefix(r.URL.Path, basePath)
+		if key == "" {
+			http.Error(w, "key cannot be empty", http.StatusNotFound)
 			return
 		}
 
