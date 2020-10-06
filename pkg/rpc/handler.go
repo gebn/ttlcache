@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gebn/ttlcache"
 
@@ -44,42 +45,72 @@ var (
 	)
 )
 
+// parseKey validates the request path, extracts the cache name and key name,
+// checks the cache name matches the cache we are serving from, and returns the
+// key name.
+func parseKey(path, prefix, cache string) (string, error) {
+	trimmed := strings.TrimPrefix(path, prefix)
+	fragments := strings.SplitN(trimmed, "/", 5) // allow splitting off one too many fragments to catch the error
+	if len(fragments) != 4 {
+		return "", fmt.Errorf("expected path of form caches/<cache>/keys/<key>, got %v", trimmed)
+	}
+	if fragments[1] != cache {
+		return "", fmt.Errorf("expecting requests for cache '%v' but got '%v'", cache, fragments[1])
+	}
+	return fragments[3], nil
+}
+
+// determineCtx examines a request for a client-side timeout. If below the
+// specified server-side timeout, it is used. If the client gave a bad value, we
+// reject the request rather than fall back.
+func determineCtx(req *http.Request, timeout time.Duration) (context.Context, context.CancelFunc, error) {
+	if deadline := req.Header.Get(deadlineHeader); deadline != "" {
+		seconds, err := strconv.ParseFloat(deadline, 64)
+		if err != nil {
+			return nil, nil, err
+		}
+		if duration := unixFractionalToDuration(seconds); duration < timeout {
+			// only override if below our server-side maximum
+			timeout = duration
+		}
+	}
+
+	// no client-side deadline. Although a given node only sends peer requests
+	// to the node it believes to be authoritative for a key, this node may have
+	// a different view of the world, and fill it from its hot cache, or indeed
+	// send it on to another node. Timeouts are essential here to ensure
+	// requests don't circulate around the cluster forever.
+	ctx, cancel := context.WithTimeout(req.Context(), timeout)
+	return ctx, cancel, nil
+}
+
 // Handler returns a http.Handler to respond to requests sent by Loader. We
 // expect requests with a path beginning with prefix, which should match the
 // first argument to http.Handle(), e.g. "/".
-func Handler(cache *ttlcache.Cache, prefix string) http.Handler {
+func Handler(cache *ttlcache.Cache, prefix string, timeout time.Duration) http.Handler {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(r.URL.Path, prefix)
-		fragments := strings.SplitN(path, "/", 5) // allow splitting off one too many fragments to catch the error
-		if len(fragments) != 4 {
-			http.Error(w, fmt.Sprintf("expected path of form caches/<cache>/keys/<key>, got %v", path), http.StatusNotFound)
+		key, err := parseKey(r.URL.Path, prefix, cache.Name)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		if fragments[1] != cache.Name {
-			http.Error(w, fmt.Sprintf("expecting requests for cache '%v' but got '%v'", cache.Name, fragments[1]), http.StatusInternalServerError)
+
+		ctx, cancel, err := determineCtx(r, timeout)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		ctx := r.Context() // no timeout if the client did not ask for one
-		if deadlineStr := r.Header.Get(deadlineHeader); deadlineStr != "" {
-			deadline, err := strconv.ParseFloat(deadlineStr, 64)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, unixFractionalToDuration(deadline))
-			defer cancel()
-		}
-		// although a given node only sends peer requests to the node it
-		// believes to be authoritative for a key, this node may have a
-		// different view of the world, and fill it from its hot cache, or
-		// indeed send it on to another node. Timeouts are essential here.
-		d, lt, err := cache.Get(ctx, fragments[3])
+		defer cancel()
+
+		d, lt, err := cache.Get(ctx, key)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		headers := w.Header()
+
+		// save Write() from trying to guess
 		headers.Add("Content-Type", "application/octet-stream")
 		headers.Add("Content-Length", strconv.Itoa(len(d)))
 		headers.Add(lifetimeCreatedHeader, fmt.Sprintf("%f", timeToUnixFractional(lt.Created)))

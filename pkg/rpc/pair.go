@@ -8,26 +8,32 @@ import (
 )
 
 // Pair is a wrapper around Loader and Handler that makes it impossible to have
-// an inconsistent base path.
+// an inconsistent base path or request timeout. Fields are exposed, but should
+// not be modified post-creation.
 type Pair struct {
-	basePath string
+
+	// BasePath is the prefix under which the loader and handler will operate,
+	// e.g. /ttlcache.
+	BasePath string
+
+	// Timeout is the per-request timeout, used for each attempt in Loader, and
+	// for the Cache.Get() call in the handler (further bounded by the request
+	// context). The number of attempts Loader makes is dictated by the context
+	// passed to it at load time.
+	Timeout time.Duration
 }
 
-// NewPair returns a new Pair wrapper that will use the specified path, e.g.
-// /ttlcache.
-func NewPair(basePath string) *Pair {
-	return &Pair{
-		basePath: basePath,
-	}
+// Loader builds a PeerLoader that will request keys from the named cache, using
+// the provided HTTP client.
+func (p *Pair) Loader(name string, client *http.Client) ttlcache.PeerLoader {
+	return Loader(name, client, p.BasePath, p.Timeout)
 }
 
-func (p *Pair) Loader(name string, client *http.Client, timeout time.Duration) ttlcache.PeerLoader {
-	return Loader(name, client, p.basePath, timeout)
-}
-
+// Handle builds a Handler to serve requests from the provided cache, then binds
+// it to the provided mux at the correct path.
 func (p *Pair) Handle(mux *http.ServeMux, cache *ttlcache.Cache) {
 	// without the trailing slash, the mux will not give us requests for
 	// subpaths, which is everything we care about
-	path := p.basePath + "/"
-	mux.Handle(path, Handler(cache, path))
+	path := p.BasePath + "/"
+	mux.Handle(path, Handler(cache, path, p.Timeout))
 }
