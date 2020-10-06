@@ -25,6 +25,39 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// This script demos a basic cluster that responds to key requests. A more
+// sophisticated demo with hot reloading will be added at some point. Launch a
+// few instances with:
+//
+// $ ./demo --peer.name a \
+//     --peer.port 7946 \
+//     --http.port 8080 \
+//     --cluster.min-members 3 \
+//     --cluster.peer 127.0.0.1:7946 \
+//     --cluster.peer 127.0.0.1:7947 \
+//     --cluster.peer 127.0.0.1:7948
+// $ ./demo --peer.name b \
+//     --peer.port 7947 \
+//     --http.port 8081 \
+//     --cluster.min-members 3 \
+//     --cluster.peer 127.0.0.1:7946 \
+//     --cluster.peer 127.0.0.1:7947 \
+//     --cluster.peer 127.0.0.1:7948
+// $ ./demo --peer.name c \
+//     --peer.port 7948 \
+//     --http.port 8082 \
+//     --cluster.min-members 3 \
+//     --cluster.peer 127.0.0.1:7946 \
+//     --cluster.peer 127.0.0.1:7947 \
+//     --cluster.peer 127.0.0.1:7948
+//
+// Then send a request to one of the instances's HTTP ports:
+//
+// $ time curl http://localhost:8081/keys/foo
+//
+// The initial request for a key, made to any node, will take ~3s; subsequent
+// requests for the same key will be nearly instantaneous, regardless of node.
+
 // multiStringValue allows us to accept multiple occurrences of a given flag on
 // the command line. Unfortunately this is not built into the flag library.
 type multiStringValue []string
@@ -42,7 +75,7 @@ func (v *multiStringValue) String() string {
 
 func load(_ context.Context, key string) ([]byte, lifetime.Lifetime, error) {
 	time.Sleep(time.Second * 3)
-	return []byte(key + " value"), lifetime.New(time.Hour * 168), nil
+	return []byte(key + " value"), lifetime.New(time.Minute * 5), nil
 }
 
 func main() {
@@ -55,7 +88,7 @@ func main() {
 	flgHTTPPort := flag.Int("http.port", 8080, "used for external requests and metrics")
 	flgClusterPeers := &multiStringValue{}
 	flag.Var(flgClusterPeers, "cluster.peer", "addr:port of peer to join, including this one; can be passed multiple times")
-	flgClusterMinMembers := flag.Int("cluster.min-members", 3, "the minimum number of cluster members before accepting external requests")
+	flgClusterMinMembers := flag.Int("cluster.min-members", 1, "the minimum number of cluster members before accepting external requests")
 	flag.Parse()
 
 	log.Printf("peer.port: %v", *flgPeerPort)
@@ -114,9 +147,9 @@ func main() {
 	// latency.
 
 	base := ttlcache.NewBase(&ttlcache.BaseOpts{
-		Name:                       "symbols",
+		Name:                       "demo",
 		PeerPicker:                 cluster.NewPeerPicker(tracker, list),
-		AuthoritativeCacheCapacity: 5452,
+		AuthoritativeCacheCapacity: 5_000,
 		HotCacheCapacity:           1_000,
 		ParallelRequests:           20,
 	})
