@@ -15,10 +15,8 @@ import (
 
 // TTLOverrides represents the lifetimes to overlay onto a set of keys. Current
 // lifetimes, including those already in local caches, will be capped at these
-// values. This mechanism does not allow increasing TTL, as the background
-// goroutines that periodically run through LRU caches are created along with
-// the cache base, and do not have access to these overrides, so could expire
-// values too soon. TTLs are checked and overridden during gets.
+// values. Note this mechanism does not allow increasing TTLs, and LRU caches
+// are unaffected - TTLs are only modified ephemerally after retrieval.
 //
 // Note, overriding a TTL to 0 will cause every non-concurrent get to hit the
 // origin. To prematurely flush values representing unknown keys, it is instead
