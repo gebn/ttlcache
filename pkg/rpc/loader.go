@@ -57,7 +57,7 @@ var (
 func Loader(name string, client *http.Client, prefix string, attempt time.Duration) ttlcache.PeerLoader {
 	if client.Transport == nil {
 		// as we override the transport, the http package no longer knows to
-		// swap in DefaultTranport - this avoids a panic
+		// swap in DefaultTransport - this avoids a panic
 		client.Transport = http.DefaultTransport
 	}
 	client.Transport = promhttp.InstrumentRoundTripperInFlight(
