@@ -18,12 +18,8 @@ func NewDelegate(port uint16) Delegate {
 	m := &Metadata{
 		Port: port,
 	}
-	return newDelegate(m.Encode())
-}
-
-func newDelegate(meta []byte) Delegate {
 	return Delegate{
-		meta: meta,
+		meta: m.Encode(),
 	}
 }
 
