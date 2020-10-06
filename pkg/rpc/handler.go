@@ -44,6 +44,27 @@ var (
 	)
 )
 
+// Handler returns a http.Handler to respond to requests sent by Loader. We
+// expect requests with a path beginning with prefix, which should match the
+// first argument to http.Handle(), e.g. "/". Note it must end with a trailing
+// slash in order to do a prefix rather than exact match.
+func Handler(cache *ttlcache.Cache, prefix string, timeout time.Duration) http.Handler {
+	return promhttp.InstrumentHandlerInFlight(
+		handleInFlight.WithLabelValues(cache.Name),
+		promhttp.InstrumentHandlerDuration(
+			handleDuration.MustCurryWith(prometheus.Labels{
+				"cache": cache.Name,
+			}),
+			promhttp.InstrumentHandlerCounter(
+				handleResponses.MustCurryWith(prometheus.Labels{
+					"cache": cache.Name,
+				}),
+				UninstrumentedHandler(cache, prefix, timeout),
+			),
+		),
+	)
+}
+
 // determineCtx examines a request for a client-side timeout. If below the
 // specified server-side timeout, it is used. If the client gave a bad value, we
 // reject the request rather than fall back.
@@ -68,14 +89,12 @@ func determineCtx(req *http.Request, timeout time.Duration) (context.Context, co
 	return ctx, cancel, nil
 }
 
-// Handler returns a http.Handler to respond to requests sent by Loader. We
-// expect requests with a path beginning with basePath, which should match the
-// first argument to http.Handle(), e.g. "/". Note it must end with a trailing
-// slash in order to do a prefix rather than exact match.
-func Handler(cache *ttlcache.Cache, basePath string, timeout time.Duration) http.Handler {
-	basePath = basePath + "keys/"
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key := strings.TrimPrefix(r.URL.Path, basePath)
+// UninstrumentedHandler provides the underlying handler used by Handler,
+// without instrumentation. This is intended to be a useful starting point for
+// an external request handler.
+func UninstrumentedHandler(cache *ttlcache.Cache, prefix string, timeout time.Duration) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := strings.TrimPrefix(r.URL.Path, prefix)
 		if key == "" {
 			http.Error(w, "key cannot be empty", http.StatusNotFound)
 			return
@@ -103,18 +122,4 @@ func Handler(cache *ttlcache.Cache, basePath string, timeout time.Duration) http
 		setDurationHeader(header, lifetimeTTLHeader, lt.TTL)
 		w.Write(d) // ignore error; cannot update headers given we've already started the body
 	})
-	return promhttp.InstrumentHandlerInFlight(
-		handleInFlight.WithLabelValues(cache.Name),
-		promhttp.InstrumentHandlerDuration(
-			handleDuration.MustCurryWith(prometheus.Labels{
-				"cache": cache.Name,
-			}),
-			promhttp.InstrumentHandlerCounter(
-				handleResponses.MustCurryWith(prometheus.Labels{
-					"cache": cache.Name,
-				}),
-				handler,
-			),
-		),
-	)
 }

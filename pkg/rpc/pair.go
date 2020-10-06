@@ -12,11 +12,12 @@ import (
 // post-creation.
 type Pair struct {
 
-	// BasePath is the prefix under which the loader and handler will operate,
-	// e.g. /ttlcache/caches/<name>. The loader and handler are deliberately not
-	// cache-aware to allow registering different handlers against different
-	// caches.
-	BasePath string
+	// Prefix is the pattern under which the loader and handler will operate,
+	// e.g. /ttlcache/caches/<name>/keys/. This is passed unmodified when
+	// binding the handler, so must end with a /. The loader and handler are
+	// deliberately not cache-aware to allow registering different handlers
+	// against different caches.
+	Prefix string
 
 	// Timeout is the per-request timeout, used for each attempt in Loader, and
 	// for the Cache.Get() call in the handler (further bounded by the request
@@ -28,7 +29,7 @@ type Pair struct {
 // Loader builds a PeerLoader that will request keys from the named cache, using
 // the provided HTTP client.
 func (p *Pair) Loader(name string, client *http.Client) ttlcache.PeerLoader {
-	return Loader(name, client, p.BasePath, p.Timeout)
+	return Loader(name, client, p.Prefix, p.Timeout)
 }
 
 // Handle builds a Handler to serve requests from the provided cache, then binds
@@ -36,6 +37,5 @@ func (p *Pair) Loader(name string, client *http.Client) ttlcache.PeerLoader {
 func (p *Pair) Handle(mux *http.ServeMux, cache *ttlcache.Cache) {
 	// without the trailing slash, the mux will not give us requests for
 	// subpaths, which is everything we care about
-	path := p.BasePath + "/"
-	mux.Handle(path, Handler(cache, path, p.Timeout))
+	mux.Handle(p.Prefix, Handler(cache, p.Prefix, p.Timeout))
 }
