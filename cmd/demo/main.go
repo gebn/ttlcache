@@ -57,6 +57,9 @@ import (
 //
 // The initial request for a key, made to any node, will take ~3s; subsequent
 // requests for the same key will be nearly instantaneous, regardless of node.
+// Prometheus metrics can be viewed at /metrics, which will give insight as to
+// what happened to the request, e.g. if it was passed to a peer or loaded from
+// the origin locally.
 
 // multiStringValue allows us to accept multiple occurrences of a given flag on
 // the command line. Unfortunately this is not built into the flag library.
@@ -154,7 +157,7 @@ func main() {
 		ParallelRequests:           20,
 	})
 	pair := &rpc.Pair{
-		Prefix:  "/ttlcache/caches/" + base.Name + "/keys/",
+		Prefix:  "/peer/caches/" + base.Name + "/keys/",
 		Timeout: time.Second * 5, // origin load + 1
 	}
 	cache := base.Configure(&ttlcache.ConfigureOpts{
@@ -170,7 +173,7 @@ func main() {
 	pair.Handle(http.DefaultServeMux, cache)
 
 	// handler for external (non-peer) requests
-	http.Handle("/key/", rpc.UninstrumentedHandler(cache, "/key/", time.Second*5))
+	http.Handle("/keys/", rpc.UninstrumentedHandler(cache, "/keys/", time.Second*5))
 
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
