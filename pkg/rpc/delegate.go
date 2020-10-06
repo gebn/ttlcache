@@ -1,5 +1,9 @@
 package rpc
 
+import (
+	"fmt"
+)
+
 // Delegate is a trivial memberlist.Delegate implementation that responds with a
 // static set of metadata. This struct is immutable.
 type Delegate struct {
@@ -24,6 +28,10 @@ func newDelegate(meta []byte) Delegate {
 }
 
 func (d Delegate) NodeMeta(limit int) []byte {
+	if len(d.meta) > limit {
+		// memberlist will panic with a less helpful error
+		panic(fmt.Sprintf("can return at most %v bytes of meta, have %v", limit, len(d.meta)))
+	}
 	return d.meta
 }
 
