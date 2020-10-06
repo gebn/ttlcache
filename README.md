@@ -1,5 +1,8 @@
 # ttlcache
 
+[![GoDoc](https://godoc.org/github.com/gebn/ttlcache?status.svg)](https://godoc.org/github.com/gebn/ttlcache)
+[![Go Report Card](https://goreportcard.com/badge/github.com/gebn/ttlcache)](https://goreportcard.com/report/github.com/gebn/ttlcache)
+
 ttlcache is a distributed cache heavily influenced by [groupcache](https://github.com/golang/groupcache).
 The primary difference is ttlcache supports indication of a TTL, and will lazily refetch a value when its TTL expires.
 It was created to avoid thundering herds when a key's value is not yet known.
