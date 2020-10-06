@@ -122,21 +122,21 @@ func Loader(name string, client *http.Client, prefix string, attempt time.Durati
 		if err != nil {
 			return nil, lifetime.Zero, err
 		}
-		return value, *lt, nil
+		return value, lt, nil
 	})
 }
 
 // parseLifetime extracts a lifetime object from response headers.
-func parseLifetime(header http.Header) (*lifetime.Lifetime, error) {
+func parseLifetime(header http.Header) (lifetime.Lifetime, error) {
 	created, err := strconv.ParseFloat(header.Get(lifetimeCreatedHeader), 64)
 	if err != nil {
-		return nil, err
+		return lifetime.Zero, err
 	}
 	duration, err := strconv.ParseFloat(header.Get(lifetimeTTLHeader), 64)
 	if err != nil {
-		return nil, err
+		return lifetime.Zero, err
 	}
-	return &lifetime.Lifetime{
+	return lifetime.Lifetime{
 		Created: unixFractionalToTime(created),
 		TTL:     unixFractionalToDuration(duration),
 	}, nil
