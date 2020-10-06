@@ -241,7 +241,7 @@ type BaseOpts struct {
 
 	// ParallelRequests is the anticipated number of concurrent gets to the
 	// cache. This is used for sizing the data structure in an internal
-	// duplicate call supression package.
+	// duplicate call suppression package.
 	ParallelRequests uint
 }
 
