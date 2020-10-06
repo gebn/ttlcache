@@ -8,8 +8,8 @@ import (
 )
 
 // Pair is a wrapper around Loader and Handler that makes it impossible to have
-// an inconsistent base path or request timeout. Fields are exposed, but should
-// not be modified post-creation.
+// an inconsistent base path or request timeout. Fields should not be modified
+// post-creation.
 type Pair struct {
 
 	// BasePath is the prefix under which the loader and handler will operate,
@@ -20,8 +20,8 @@ type Pair struct {
 
 	// Timeout is the per-request timeout, used for each attempt in Loader, and
 	// for the Cache.Get() call in the handler (further bounded by the request
-	// context). The number of attempts Loader makes is dictated by the context
-	// passed to it at load time.
+	// context). The number of attempts Loader makes is dictated by the deadline
+	// on the context passed to it at load time.
 	Timeout time.Duration
 }
 
