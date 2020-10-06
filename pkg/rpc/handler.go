@@ -108,13 +108,13 @@ func Handler(cache *ttlcache.Cache, prefix string, timeout time.Duration) http.H
 			return
 		}
 
-		headers := w.Header()
+		header := w.Header()
 
 		// save Write() from trying to guess
-		headers.Add("Content-Type", "application/octet-stream")
-		headers.Add("Content-Length", strconv.Itoa(len(d)))
-		headers.Add(lifetimeCreatedHeader, fmt.Sprintf("%f", timeToUnixFractional(lt.Created)))
-		headers.Add(lifetimeTTLHeader, fmt.Sprintf("%f", durationToUnixFractional(lt.TTL)))
+		header.Set("Content-Type", "application/octet-stream")
+		header.Set("Content-Length", strconv.Itoa(len(d)))
+		setTimeHeader(header, lifetimeCreatedHeader, lt.Created)
+		setDurationHeader(header, lifetimeTTLHeader, lt.TTL)
 		w.Write(d) // ignore error; cannot update headers given we've already started the body
 	})
 	return promhttp.InstrumentHandlerInFlight(

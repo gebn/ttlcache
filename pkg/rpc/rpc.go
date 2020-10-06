@@ -2,6 +2,8 @@
 package rpc
 
 import (
+	"fmt"
+	"net/http"
 	"time"
 )
 
@@ -39,4 +41,12 @@ func durationToUnixFractional(d time.Duration) float64 {
 
 func unixFractionalToDuration(d float64) time.Duration {
 	return time.Duration(d * float64(time.Second/time.Nanosecond))
+}
+
+func setTimeHeader(header http.Header, name string, value time.Time) {
+	header.Set(name, fmt.Sprintf("%f", timeToUnixFractional(value)))
+}
+
+func setDurationHeader(header http.Header, name string, value time.Duration) {
+	header.Set(name, fmt.Sprintf("%f", durationToUnixFractional(value)))
 }
