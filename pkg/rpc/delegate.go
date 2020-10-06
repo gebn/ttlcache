@@ -31,11 +31,7 @@ func (d Delegate) NodeMeta(limit int) []byte {
 	return d.meta
 }
 
-func (d Delegate) NotifyMsg(_ []byte) {}
-func (d Delegate) GetBroadcasts(_, _ int) [][]byte {
-	return nil
-}
-func (d Delegate) LocalState(_ bool) []byte {
-	return nil
-}
+func (d Delegate) NotifyMsg(_ []byte)                {}
+func (d Delegate) GetBroadcasts(_, _ int) [][]byte   { return nil }
+func (d Delegate) LocalState(_ bool) []byte          { return nil }
 func (d Delegate) MergeRemoteState(_ []byte, _ bool) {}
