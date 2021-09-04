@@ -94,9 +94,9 @@ func (b *Base) Configure(opts *ConfigureOpts) *Cache {
 // reload the key if the TTL has been reached. Due to thread scheduling, we
 // cannot promise to never return a TTL that has expired.  When retrieving a
 // fresh value, we don't check the expiry, as then values may never get back to
-// the user. Internal processing time is not deducted from the TTL.  It is not
-// possible to know whether the value was fetched or already cached; that is
-// only exposed in metrics in aggregate.
+// the user. Internal processing time is not deducted from the TTL. It is not
+// possible for the caller to know whether the value was fetched or already
+// cached; that is only exposed in metrics in aggregate.
 func (c *Cache) Get(ctx context.Context, key string) ([]byte, lifetime.Lifetime, error) {
 	timer := prometheus.NewTimer(c.Base.getDuration)
 	defer timer.ObserveDuration()
@@ -123,8 +123,8 @@ func (c *Cache) Get(ctx context.Context, key string) ([]byte, lifetime.Lifetime,
 	// it and add it to the correct LRU cache
 	c.Base.getDedupeAttempts.Inc()
 	deduped, data, lt, err := c.Base.flight.Do(key, func() ([]byte, lifetime.Lifetime, error) {
-		// we must re-check the authoritative and hot caches due to an
-		// unfortunate goroutine scheduling
+		// we must re-check the authoritative and hot caches in case another
+		// goroutine has already loaded the key
 		c.Base.authoritativeGets.Inc()
 		if d, lt := c.tryLRU(key, c.Base.authoritative); d != nil {
 			return d, lt, nil
@@ -150,9 +150,9 @@ func (c *Cache) Get(ctx context.Context, key string) ([]byte, lifetime.Lifetime,
 				c.maybeHotCache(key, d, lt)
 				return d, c.capLifetime(key, lt), nil
 			}
-			// peer may have died between pick and request; if we wanted to be
-			// more aggressive about deduplicating loads, we could re-pick and
-			// try again before falling back to loading ourselves
+			// peer may have died between pick and request; if we wanted to
+			// deduplicate loads more aggressively, we could re-pick and try
+			// again before falling back to loading ourselves
 			c.Base.peerLoadFailures.Inc()
 		}
 

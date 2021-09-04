@@ -255,6 +255,21 @@ type Base struct {
 	// we have to keep these separate, as otherwise all nodes would converge on
 	// a common set of popular keys, which would be very inefficient for the
 	// cluster. A peer load is always preferable to an origin load.
+	//
+	// As peers change, the set keys for which we are authoritative can change
+	// at any time, behind our back. Keys may also return to our ownership when
+	// a failure is resolved. As we're using LRU caches, values that fall out of
+	// use will eventually be evicted naturally; in the meantime, they are only
+	// a suboptimal use of memory. It would be futile to try to manage this. We
+	// chose to not manually evict expired values for a similar reason.
+	//
+	// It is debatable whether we want to keep the authoritative and hot caches
+	// separate. On one hand, they contain the same thing, and is it such a bad
+	// thing if we drop our own keys in favour of those requested more often?
+	// The decision was that, in aggregate across the cluster, yes. Separation
+	// allows easier tracking or saturation and evictions, and ensures we can
+	// handle larger caches by not having every member converge towards storing
+	// the same set of active keys.
 	authoritative, hot *lru.Cache
 	flight             *singleflight.Group
 
@@ -325,6 +340,7 @@ func onEviction(premature prometheus.Observer, expired prometheus.Observer) lru.
 	return lru.EvictionFunc(func(lt lifetime.Lifetime) {
 		remaining := lt.Remaining().Seconds()
 		if lt.Expired() {
+			// will be <0, so make positive to avoid breaking the histogram
 			expired.Observe(-remaining)
 		} else {
 			premature.Observe(remaining)

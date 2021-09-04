@@ -9,7 +9,8 @@ import (
 // OriginLoader knows how to retrieve the values for keys unknown to the cache,
 // from the original source. This is the key interface implemented by users of
 // the library. An instance is provided when configuring a particular base, so
-// the cache name is not passed.
+// the cache name is not passed. Implementations must be safe for concurrent
+// use.
 type OriginLoader interface {
 
 	// SourceLoader was considered for this, however source is relative; the
@@ -20,22 +21,22 @@ type OriginLoader interface {
 	// reloaded until their TTL has been reached. The TTL returned can be
 	// retrospectively modified via an override, which allows decreasing the
 	// value, however this is only intended for emergencies in very limited
-	// scenarios. If you do not want a TTL, you may want to consider another
-	// library, however infinite TTLs can be emulated by returning
-	// lifetime.New(lifetime.MaxDuration). This method may be called on any
-	// instance in the cluster for any key, so should return a deterministic,
-	// consistent value.
+	// scenarios. Infinite TTLs can be emulated by returning
+	// lifetime.New(lifetime.MaxDuration), however if you do not want TTLs, you
+	// may want to consider another library. This method may be called on any
+	// instance in the cluster for any key at any time, so should return a
+	// deterministic, consistent value.
 	//
-	// Note the context expiry is defined when configuring a base cache, not by
-	// incoming external requests. Because we deduplicate gets, we don't want
-	// one impatient client causing everyone else a failed request because their
-	// request was the one that arrived first.
+	// Note the expiry of the context is defined when configuring a base cache,
+	// not by incoming external requests. We deduplicate loads, so want to avoid
+	// the situation where one one impatient client causes everyone waiting on
+	// the same key to receive an error.
 	//
 	// It is strongly recommended to stagger TTL expiration to avoid a
 	// thundering herd on the origin, especially if it is remote. To achieve
 	// this, add some jitter to the TTL to spread them over the longest period
-	// you can tolderate. Remember the jitter must be deterministic, so use a
-	// value derived from the key rather than rand, e.g. crc32.
+	// that can be tolerated. Remember the jitter must be deterministic, so use
+	// a value derived from the key, e.g. crc32, rather than math/rand.
 	//
 	// Excluding failure scenarios, this will only be called once for a given
 	// key, by the cluster member that owns that key. If that cluster member
@@ -47,7 +48,7 @@ type OriginLoader interface {
 	// retrieved due to a transient error - not because they key does not (yet)
 	// exist. In this case, it is recommended to return a static value with a
 	// short TTL, which will prevent the cache from retrying for a period of
-	// time. This method is responsible for doing its own retries as
+	// time. This method is responsible for implementing its own retries as
 	// appropriate.
 	Load(ctx context.Context, key string) ([]byte, lifetime.Lifetime, error)
 }
