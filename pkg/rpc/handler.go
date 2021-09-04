@@ -44,10 +44,11 @@ var (
 	)
 )
 
-// Handler returns a http.Handler to respond to requests sent by Loader. We
-// expect requests with a path beginning with prefix, which should match the
-// first argument to http.Handle(), e.g. "/". Note it must end with a trailing
-// slash in order to do a prefix rather than exact match.
+// Handler returns a http.Handler to respond to requests sent by the PeerLoader
+// returned by Loader(). We expect requests with a path beginning with prefix,
+// which should match the first argument to http.Handle(), e.g. "/". Note it
+// must end with a trailing slash in order to do a prefix rather than exact
+// match.
 func Handler(cache *ttlcache.Cache, prefix string, timeout time.Duration) http.Handler {
 	return promhttp.InstrumentHandlerInFlight(
 		handleInFlight.WithLabelValues(cache.Name),
