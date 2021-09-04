@@ -175,7 +175,7 @@ func main() {
 	// handler for external (non-peer) requests
 	http.Handle("/keys/", rpc.UninstrumentedHandler(cache, "/keys/", time.Second*5))
 
-	quit := make(chan os.Signal)
+	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	fmt.Println() // avoids "^C" being printed on the same line as the log date
