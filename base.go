@@ -240,8 +240,8 @@ type BaseOpts struct {
 	HotCacheCapacity uint
 
 	// ParallelRequests is the anticipated number of concurrent gets to the
-	// cache. This is used for sizing the data structure in an internal
-	// duplicate call suppression package.
+	// cache. This is used for initial sizing of a data structure in an
+	// internal duplicate call suppression package.
 	ParallelRequests uint
 }
 
