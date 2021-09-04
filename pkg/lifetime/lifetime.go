@@ -21,10 +21,10 @@ var (
 	Zero = Lifetime{}
 )
 
-// Lifetime represents when a value was created, and the time from that instant
+// Lifetime describes when a value was created, and the time from that instant
 // that it expires. This should be used as an immutable value type.
 //
-// We represent TTLs as a time of creation, plus a duration (which is the
+// We represent lifetimes as a time of creation, plus a duration (which is the
 // literal TTL). This allows finding out when a value was created from its TTL,
 // without having to embed it in the value. We require this at a library level
 // for implementing TTL overrides.
@@ -62,8 +62,8 @@ func (l Lifetime) Expired() bool {
 	return l.Remaining() < 0
 }
 
-// Cap imposes an upper limit on the lifetime from the point of creation. If the
-// existing TTL is below the cap one, the original lifetime is returned.
+// Cap imposes an upper limit on the lifetime from the point of creation. If
+// the existing TTL is shorter than the cap, the original lifetime is returned.
 func (l Lifetime) Cap(duration time.Duration) Lifetime {
 	if l.TTL < duration {
 		return l
