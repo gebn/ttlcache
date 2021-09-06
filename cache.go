@@ -169,15 +169,15 @@ func (c *Cache) Get(ctx context.Context, key string) ([]byte, lifetime.Lifetime,
 			c.Base.getFailures.Inc()
 			return nil, lifetime.Zero, err
 		}
-		if node == nil {
+		if node != nil {
+			// zero duration check done for us
+			c.maybeHotCache(key, d, lt)
+		} else {
 			// we are authoritative; always cache if non-zero TTL
 			if lt.TTL != 0 {
 				c.Base.authoritative.Put(key, d, lt)
 				c.Base.authoritativePuts.Inc()
 			}
-		} else {
-			// zero duration check done for us
-			c.maybeHotCache(key, d, lt)
 		}
 		return d, c.capLifetime(key, lt), nil
 	})
