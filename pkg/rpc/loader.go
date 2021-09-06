@@ -108,6 +108,10 @@ func Loader(cache string, client *http.Client, basePath string, perAttempt time.
 		if err != nil {
 			return nil, lifetime.Zero, err
 		}
+		if len(value) == 0 {
+			// we are required to return nil rather than a zero-length []byte
+			return nil, lt, nil
+		}
 		return value, lt, nil
 	})
 }

@@ -90,13 +90,14 @@ func (b *Base) Configure(opts *ConfigureOpts) *Cache {
 }
 
 // Get retrieves an element from the cache, returning the data along with its
-// TTL. Our guarantee is to check the TTL before handing the value back, and
-// reload the key if the TTL has been reached. Due to thread scheduling, we
-// cannot promise to never return a TTL that has expired.  When retrieving a
-// fresh value, we don't check the expiry, as then values may never get back to
-// the user. Internal processing time is not deducted from the TTL. It is not
-// possible for the caller to know whether the value was fetched or already
-// cached; that is only exposed in metrics in aggregate.
+// TTL. The TTL is checked before handing the value back, and the key reloaded
+// if it has expired. Due to thread scheduling, we cannot promise to never
+// return a TTL that has expired. When retrieving a fresh value, the expiry is
+// not checked again to avoid going into a loop. Internal processing time is
+// not deducted from the TTL. It is not possible for the caller to know whether
+// the value was fetched or already cached; that is only exposed in metrics in
+// aggregate. Zero-length data is returned as nil; a non-nil value will have a
+// length of at least 1.
 func (c *Cache) Get(ctx context.Context, key string) ([]byte, lifetime.Lifetime, error) {
 	timer := prometheus.NewTimer(c.Base.getDuration)
 	defer timer.ObserveDuration()
@@ -104,12 +105,12 @@ func (c *Cache) Get(ctx context.Context, key string) ([]byte, lifetime.Lifetime,
 	// check authoritative and hot outside singleflight - this is more
 	// lightweight
 	c.Base.authoritativeGets.Inc()
-	if d, lt := c.tryLRU(key, c.Base.authoritative); d != nil {
+	if d, lt, ok := c.tryLRU(key, c.Base.authoritative); ok {
 		return d, lt, nil
 	}
 	c.Base.authoritativeMisses.Inc()
 	c.Base.hotGets.Inc()
-	if d, lt := c.tryLRU(key, c.Base.hot); d != nil {
+	if d, lt, ok := c.tryLRU(key, c.Base.hot); ok {
 		return d, lt, nil
 	}
 	c.Base.hotMisses.Inc()
@@ -126,14 +127,14 @@ func (c *Cache) Get(ctx context.Context, key string) ([]byte, lifetime.Lifetime,
 		// we must re-check the authoritative and hot caches in case another
 		// goroutine has already loaded the key
 		c.Base.authoritativeGets.Inc()
-		if d, lt := c.tryLRU(key, c.Base.authoritative); d != nil {
+		if d, lt, ok := c.tryLRU(key, c.Base.authoritative); ok {
 			return d, lt, nil
 		}
 		// it may have been a hit, but a TTL override caused it to effectively
 		// be a miss
 		c.Base.authoritativeMisses.Inc()
 		c.Base.hotGets.Inc()
-		if d, lt := c.tryLRU(key, c.Base.hot); d != nil {
+		if d, lt, ok := c.tryLRU(key, c.Base.hot); ok {
 			return d, lt, nil
 		}
 		c.Base.hotMisses.Inc()
@@ -194,14 +195,16 @@ func (c *Cache) capLifetime(key string, lt lifetime.Lifetime) lifetime.Lifetime 
 	return lt
 }
 
-func (c *Cache) tryLRU(key string, lruc *lru.Cache) ([]byte, lifetime.Lifetime) {
+// tryLRU attempts to find a key in the provided LRU cache, accounting for
+// lifetime overrides.
+func (c *Cache) tryLRU(key string, lruc *lru.Cache) ([]byte, lifetime.Lifetime, bool) {
 	d, lt, ok := lruc.Get(key)
 	if !ok {
-		return nil, lifetime.Zero
+		return nil, lifetime.Zero, false
 	}
 
-	// if lt.Expired() here, an override could only make it "more" expired. We
-	// don't remove it from the cache as a remove followed by an update (we
+	// if the value has expired, an override could only make it "more" expired.
+	// We don't remove it from the cache as a remove followed by an update (we
 	// assume we will successfully retrieve the new value) is more expensive
 	// than an update in place.
 
@@ -209,7 +212,7 @@ func (c *Cache) tryLRU(key string, lruc *lru.Cache) ([]byte, lifetime.Lifetime) 
 	lt = c.capLifetime(key, lt)
 	if lt.Expired() {
 		// possibly due only to the override in place
-		return nil, lifetime.Zero
+		return nil, lifetime.Zero, false
 	}
 
 	// overridden TTLs are not updated in the LRU caches - we overlay them after
@@ -217,7 +220,7 @@ func (c *Cache) tryLRU(key string, lruc *lru.Cache) ([]byte, lifetime.Lifetime) 
 	// becomes visible again. As an override can only shorten a TTL, this means
 	// we don't prematurely expire what would otherwise be valid values - we
 	// assume overrides are shortlived.
-	return d, lt
+	return d, lt, true
 }
 
 func (c *Cache) peerLoad(ctx context.Context, node *memberlist.Node, key string) ([]byte, lifetime.Lifetime, error) {

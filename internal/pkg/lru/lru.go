@@ -12,6 +12,7 @@ import (
 // successful result of an OriginLoader.Load() call. It is a value type within
 // the cache.
 type value struct {
+	// data is allowed to be nil.
 	data     []byte
 	lifetime lifetime.Lifetime
 }
@@ -84,9 +85,9 @@ func NewCache(capacity uint, onEvict EvictionFunc) *Cache {
 	}
 }
 
-// Get retrieves the values stored under a key. If the key does not exist, the
-// bool will be false, in which case other return values should be ignored. The
-// returned values must not be modified.
+// Get retrieves the value stored under a key. If the key does not exist, the
+// bool will be false, in which case other return values should be ignored. A
+// key may contain nil data. The returned values must not be modified.
 func (c *Cache) Get(key string) ([]byte, lifetime.Lifetime, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -99,7 +100,7 @@ func (c *Cache) Get(key string) ([]byte, lifetime.Lifetime, bool) {
 }
 
 // Put adds, or updates the value stored under, a key. It returns whether the
-// key already existed in the cache.
+// key already existed in the cache. Data may be nil.
 func (c *Cache) Put(key string, data []byte, lt lifetime.Lifetime) bool {
 	if c.capacity == 0 {
 		return false

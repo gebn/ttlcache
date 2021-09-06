@@ -16,16 +16,10 @@ type OriginLoader interface {
 	// SourceLoader was considered for this, however source is relative; the
 	// point is the source is the *original* source - not another peer.
 
-	// Load produces the value for a key, along with its lifetime. This is
-	// similar to Sink in groupcache. Values are cached amongst peers, and not
-	// reloaded until their TTL has been reached. The TTL returned can be
-	// retrospectively modified via an override, which allows decreasing the
-	// value, however this is only intended for emergencies in very limited
-	// scenarios. Infinite TTLs can be emulated by returning
-	// lifetime.New(lifetime.MaxDuration), however if you do not want TTLs, you
-	// may want to consider another library. This method may be called on any
-	// instance in the cluster for any key at any time, so should return a
-	// deterministic, consistent value.
+	// Load produces the value for a key, along with its lifetime. Zero-length
+	// data must be returned as nil. This method may be called for any key on
+	// any instance in the cluster at any time, so should return a
+	// deterministic, consistent value. This is similar to Sink in groupcache.
 	//
 	// Note the expiry of the context is defined when configuring a base cache,
 	// not by incoming external requests. We deduplicate loads, so want to avoid
@@ -37,6 +31,13 @@ type OriginLoader interface {
 	// this, add some jitter to the TTL to spread them over the longest period
 	// that can be tolerated. Remember the jitter must be deterministic, so use
 	// a value derived from the key, e.g. crc32, rather than math/rand.
+	//
+	// Values are cached amongst peers, and not reloaded until their TTL has
+	// been reached. The TTL returned can be retrospectively modified via an
+	// override, which allows decreasing the value, however this is only
+	// intended for emergencies in very limited scenarios. Infinite TTLs can be
+	// emulated by returning lifetime.New(lifetime.MaxDuration), however if you
+	// do not want TTLs, you may want to consider another library.
 	//
 	// Excluding failure scenarios, this will only be called once for a given
 	// key, by the cluster member that owns that key. If that cluster member

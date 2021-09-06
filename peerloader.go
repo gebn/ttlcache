@@ -19,7 +19,8 @@ type PeerLoader interface {
 
 	// Load requests a key from the specified peer, which will currently always
 	// be the authoritative peer. This peer should call cache.Get(), which may
-	// result in a load via the OriginLoader.
+	// result in a load via the OriginLoader. Zero-length data must be returned
+	// as nil.
 	Load(ctx context.Context, from *memberlist.Node, cache *Cache, key string) ([]byte, lifetime.Lifetime, error)
 }
 
