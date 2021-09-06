@@ -48,7 +48,8 @@ var (
 // returned by Loader(). We expect requests with a path beginning with prefix,
 // which should match the first argument to http.Handle(), e.g. "/". Note it
 // must end with a trailing slash in order to do a prefix rather than exact
-// match.
+// match. The timeout is to prevent gets endlessly bouncing around a cluster,
+// even if the client is willing to wait.
 func Handler(cache *ttlcache.Cache, prefix string, timeout time.Duration) http.Handler {
 	return promhttp.InstrumentHandlerInFlight(
 		handleInFlight.WithLabelValues(cache.Name),
@@ -85,7 +86,7 @@ func determineCtx(req *http.Request, timeout time.Duration) (context.Context, co
 	// to the node it believes to be authoritative for a key, this node may have
 	// a different view of the world, and fill it from its hot cache, or indeed
 	// send it on to another node. Timeouts are essential here to ensure
-	// requests don't circulate around the cluster forever.
+	// requests don't bounce around the cluster forever.
 	ctx, cancel := context.WithTimeout(req.Context(), timeout)
 	return ctx, cancel, nil
 }

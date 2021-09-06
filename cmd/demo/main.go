@@ -157,20 +157,21 @@ func main() {
 		ParallelRequests:           20,
 	})
 	pair := &rpc.Pair{
-		Prefix:  "/peer/caches/" + base.Name + "/keys/",
-		Timeout: time.Second * 5, // origin load + 1
+		Prefix: "/peer/caches/" + base.Name + "/keys/",
 	}
 	cache := base.Configure(&ttlcache.ConfigureOpts{
 		OriginLoader:      ttlcache.OriginLoaderFunc(load),
-		OriginLoadTimeout: time.Second * 4,                        // local, end-to-end, including any retries
-		PeerLoader:        pair.Loader(base.Name, &http.Client{}), // must be dedicated client
-		PeerLoadTimeout:   time.Second * 10,                       // allow a retry; want to avoid local origin load if possible
+		OriginLoadTimeout: time.Second * 4, // local, end-to-end, including any retries
+		PeerLoader: pair.Loader(base.Name, &http.Client{ // must be dedicated client
+			Timeout: time.Second * 5, // origin load + 1
+		}),
+		PeerLoadTimeout:   time.Second * 10, // allow a retry; want to avoid local origin load if possible
 		HotAddProbability: 0.05,
 	})
 
 	// there is a small window on start during which peers send us requests
 	// before our endpoint is up; they will back off
-	pair.Handle(http.DefaultServeMux, cache)
+	pair.Handle(http.DefaultServeMux, cache, time.Second*10)
 
 	// handler for external (non-peer) requests
 	http.Handle("/keys/", rpc.UninstrumentedHandler(cache, "/keys/", time.Second*5))

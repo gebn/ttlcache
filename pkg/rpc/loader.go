@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"path"
 	"strconv"
-	"time"
 
 	"github.com/gebn/ttlcache"
 	"github.com/gebn/ttlcache/pkg/lifetime"
@@ -54,10 +53,11 @@ var (
 // Loader returns a new PeerLoader that will send requests to
 // <addr>:<metaport><basePath>/keys/<key> using the provided client. As we
 // modify the client's transport, it should not be used for any other purpose,
-// as the requests will lead to incorrect metrics. The loader implementation
-// will back-off exponentially until the context expires. If non-empty, the base
-// path must begin with a /.
-func Loader(cache string, client *http.Client, basePath string, perAttempt time.Duration) ttlcache.PeerLoader {
+// as the requests will lead to incorrect metrics. The timeout of each request
+// is controlled by the client's Timeout. The loader implementation will back-off
+// exponentially until the context expires. If non-empty, the base path must
+// begin with a /.
+func Loader(cache string, client *http.Client, basePath string) ttlcache.PeerLoader {
 	// we demand the cache name only so we can initialise time series
 	// immediately without waiting for the first outgoing peer request
 	if client.Transport == nil {
@@ -86,7 +86,9 @@ func Loader(cache string, client *http.Client, basePath string, perAttempt time.
 		}
 		var resp *http.Response
 		err = backoff.Retry(func() error {
-			ctx, cancel := context.WithTimeout(ctx, perAttempt)
+			// we wouldn't need this were it not for our desire to indicate to
+			// the server what our timeout is
+			ctx, cancel := context.WithTimeout(ctx, client.Timeout)
 			defer cancel()
 			if deadline, ok := ctx.Deadline(); ok { // always expect to be true
 				// must replace any existing value from previous attempt
