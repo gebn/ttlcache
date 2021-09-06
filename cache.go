@@ -10,6 +10,12 @@ import (
 
 	"github.com/hashicorp/memberlist"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+)
+
+var (
+	tracer = otel.Tracer("github.com/gebn/ttlcache")
 )
 
 // TTLOverrides represents the lifetimes to overlay onto a set of keys. Current
@@ -157,12 +163,13 @@ func (c *Cache) Get(ctx context.Context, key string) ([]byte, lifetime.Lifetime,
 			c.Base.peerLoadFailures.Inc()
 		}
 
-		// owned by us, or peer load failure. Note we no longer care about the
-		// client for this request - we want to load the key successfully; at
-		// some point we could potentially cap this to the current request but
-		// put the key on a queue to attempt to fill in the background with a
-		// longer timeout, but that feels like overengineering.
-		ctx, cancel := context.WithTimeout(context.Background(), c.originLoadTimeout)
+		// owned by us, or peer load failure. We no longer care about the
+		// current client's patience, however we need to propagate context to
+		// allow traces to work.
+		// TODO kick off a background origin load with timeout
+		// c.originLoadTimeout, and subscribe this client to that load, timing
+		// out with their context.
+		ctx, cancel := context.WithTimeout(ctx, c.originLoadTimeout)
 		defer cancel()
 		d, lt, err := c.originLoad(ctx, key)
 		if err != nil {
@@ -224,14 +231,28 @@ func (c *Cache) tryLRU(key string, lruc *lru.Cache) ([]byte, lifetime.Lifetime, 
 }
 
 func (c *Cache) peerLoad(ctx context.Context, node *memberlist.Node, key string) ([]byte, lifetime.Lifetime, error) {
+	ctx, span := tracer.Start(ctx, "peer-load")
+	span.SetAttributes(
+		attribute.String("ttlcache.key", key),
+		attribute.String("memberlist.node.name", node.Name),
+		attribute.String("memberlist.node.address", node.Address()),
+	)
+	defer span.End()
+
 	timer := prometheus.NewTimer(c.Base.peerLoadDuration)
 	defer timer.ObserveDuration()
+
 	return c.peerLoader.Load(ctx, node, c, key)
 }
 
 func (c *Cache) originLoad(ctx context.Context, key string) ([]byte, lifetime.Lifetime, error) {
+	ctx, span := tracer.Start(ctx, "origin-load")
+	span.SetAttributes(attribute.String("ttlcache.key", key))
+	defer span.End()
+
 	timer := prometheus.NewTimer(c.Base.originLoadDuration)
 	defer timer.ObserveDuration()
+
 	return c.originLoader.Load(ctx, key)
 }
 
