@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 var (
@@ -61,7 +62,7 @@ func Handler(cache *ttlcache.Cache, prefix string, timeout time.Duration) http.H
 				handleResponses.MustCurryWith(prometheus.Labels{
 					"cache": cache.Name,
 				}),
-				UninstrumentedHandler(cache, prefix, timeout),
+				otelhttp.NewHandler(UninstrumentedHandler(cache, prefix, timeout), "GET /:key"),
 			),
 		),
 	)

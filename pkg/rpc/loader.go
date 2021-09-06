@@ -11,13 +11,14 @@ import (
 	"strconv"
 
 	"github.com/gebn/ttlcache"
+	"github.com/gebn/ttlcache/internal/pkg/backoff"
 	"github.com/gebn/ttlcache/pkg/lifetime"
 
-	"github.com/cenkalti/backoff/v4"
 	"github.com/hashicorp/memberlist"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 var (
@@ -75,7 +76,7 @@ func Loader(cache string, client *http.Client, basePath string) ttlcache.PeerLoa
 				loadResponses.MustCurryWith(prometheus.Labels{
 					"cache": cache,
 				}),
-				client.Transport,
+				otelhttp.NewTransport(client.Transport),
 			),
 		),
 	)
@@ -85,18 +86,18 @@ func Loader(cache string, client *http.Client, basePath string) ttlcache.PeerLoa
 			return nil, lifetime.Zero, err
 		}
 		var resp *http.Response
-		err = backoff.Retry(func() error {
+		err = backoff.Backoff(ctx, func(ctx context.Context) error {
 			// we wouldn't need this were it not for our desire to indicate to
 			// the server what our timeout is
 			ctx, cancel := context.WithTimeout(ctx, client.Timeout)
 			defer cancel()
 			if deadline, ok := ctx.Deadline(); ok { // always expect to be true
-				// must replace any existing value from previous attempt
+				// must replace any existing header from previous attempt
 				setTimeHeader(req.Header, deadlineHeader, deadline)
 			}
 			resp, err = doAttempt(client, req.WithContext(ctx))
 			return err
-		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
+		})
 		if err != nil {
 			// body has been closed
 			return nil, lifetime.Zero, err
