@@ -144,8 +144,8 @@ func (c *Cache) Get(ctx context.Context, key string) ([]byte, lifetime.Lifetime,
 		if node != nil {
 			// owned by another peer
 			ctx, cancel := context.WithTimeout(ctx, c.peerLoadTimeout)
+			defer cancel()
 			d, lt, err := c.peerLoad(ctx, node, key)
-			cancel()
 			if err == nil {
 				c.maybeHotCache(key, d, lt)
 				return d, c.capLifetime(key, lt), nil
@@ -162,8 +162,8 @@ func (c *Cache) Get(ctx context.Context, key string) ([]byte, lifetime.Lifetime,
 		// put the key on a queue to attempt to fill in the background with a
 		// longer timeout, but that feels like overengineering.
 		ctx, cancel := context.WithTimeout(context.Background(), c.originLoadTimeout)
+		defer cancel()
 		d, lt, err := c.originLoad(ctx, key)
-		cancel()
 		if err != nil {
 			c.Base.originLoadFailures.Inc()
 			c.Base.getFailures.Inc()
