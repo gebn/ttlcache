@@ -3,7 +3,7 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -100,7 +100,7 @@ func Loader(cache string, client *http.Client, basePath string, perAttempt time.
 			return nil, lifetime.Zero, err
 		}
 		defer resp.Body.Close()
-		value, err := ioutil.ReadAll(resp.Body)
+		value, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, lifetime.Zero, err
 		}
